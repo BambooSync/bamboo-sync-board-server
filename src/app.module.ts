@@ -7,6 +7,7 @@ import { ConfigModule } from '@nestjs/config';
 import { BoardModule } from './board/board.module';
 import { ColumnModule } from './collumn/column.module';
 import { TaskModule } from './task/task.module';
+import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { TaskModule } from './task/task.module';
     BoardModule,
     ColumnModule,
     TaskModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [AppService],
