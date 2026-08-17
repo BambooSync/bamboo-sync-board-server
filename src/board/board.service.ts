@@ -7,7 +7,7 @@ import { UpdateBoardDto } from './dto/update-board.dto';
 export class BoardService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateBoardDto, ownerId: string) {
+  async create(dto: CreateBoardDto, ownerId: string) { // Create a new board with default columns and add the owner as a member
     return this.prisma.board.create({
       data: {
         name: dto.name,
@@ -29,7 +29,7 @@ export class BoardService {
     });
   }
 
-  async findAllForUser(userId: string) {
+  async findAllForUser(userId: string) { // Take all boards where the user is either the owner or a member
     return this.prisma.board.findMany({
       where: {
         OR: [
@@ -41,7 +41,7 @@ export class BoardService {
     });
   }
 
-  async findOne(id: string, userId: string) {
+  async findOne(id: string, userId: string) { // Check if the user is a member or owner of the board
     const board = await this.prisma.board.findUnique({
       where: { id },
       include: {
@@ -59,12 +59,13 @@ export class BoardService {
     return board;
   }
 
-  async update(id: string, dto: UpdateBoardDto, userId: string) {
+  async update(id: string, dto: UpdateBoardDto, userId: string) { // Check if the user is the owner or an editor of the board
     await this.checkOwnerOrEditor(id, userId);
     return this.prisma.board.update({ where: { id }, data: dto });
   }
 
-  async remove(id: string, userId: string) {
+  async remove(id: string, userId: string) { // Check if the user is the owner of the board
+
     const board = await this.prisma.board.findUnique({ where: { id } });
     if (!board) throw new NotFoundException('Board not exist');
     if (board.ownerId !== userId) throw new ForbiddenException('Only the owner can delete the board');
@@ -89,7 +90,7 @@ export class BoardService {
     return board;
   }
 
-  private async checkOwnerOrEditor(boardId: string, userId: string) {
+  private async checkOwnerOrEditor(boardId: string, userId: string) { // Check if the user is the owner or an editor of the board
     const member = await this.prisma.boardMember.findUnique({
       where: { boardId_userId: { boardId, userId } },
     });
