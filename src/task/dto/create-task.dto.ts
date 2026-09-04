@@ -1,5 +1,11 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsDateString } from 'class-validator';
-import { Priority } from '@prisma/client';   // <-- import enum thật từ Prisma Client đã generate
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsEnum,
+  IsDateString,
+} from 'class-validator';
+import { Priority } from '@prisma/client'; // <-- import enum thật từ Prisma Client đã generate
 
 export class CreateTaskDto {
   @IsString()
@@ -11,8 +17,8 @@ export class CreateTaskDto {
   description?: string;
 
   @IsOptional()
-  @IsEnum(Priority)              // <-- dùng enum Priority thay vì mảng string tay
-  priority?: Priority;            // <-- kiểu đúng là Priority, không phải string
+  @IsEnum(Priority) // <-- dùng enum Priority thay vì mảng string tay
+  priority?: Priority; // <-- kiểu đúng là Priority, không phải string
 
   @IsOptional()
   @IsDateString()

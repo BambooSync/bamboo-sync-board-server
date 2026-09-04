@@ -8,7 +8,7 @@ export class AppController {
 
   @Get('health')
   async healthCheck() {
-      const userCount = await this.prisma.user.count();
-      return { status: 'ok', userCount };
+    const userCount = await this.prisma.user.count();
+    return { status: 'ok', userCount };
   }
 }

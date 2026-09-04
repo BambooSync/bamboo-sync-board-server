@@ -5,7 +5,7 @@ import {
   MessageBody,
   ConnectedSocket,
   OnGatewayDisconnect,
-  OnGatewayConnection
+  OnGatewayConnection,
 } from '@nestjs/websockets';
 
 import { OnEvent } from '@nestjs/event-emitter';
@@ -18,7 +18,6 @@ import { ConfigService } from '@nestjs/config';
 @WebSocketGateway({
   cors: { origin: '*' },
 })
-
 export class BoardGateway implements OnGatewayDisconnect {
   @WebSocketServer()
   server!: Server;
@@ -26,14 +25,16 @@ export class BoardGateway implements OnGatewayDisconnect {
   constructor(
     private readonly presenceService: PresenceService,
     private readonly jwtService: JwtService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
   ) {}
 
   async handleConnection(client: Socket) {
     try {
-      const token = client.handshake.auth?.token || client.handshake.headers?.authorization?.replace('Bearer', '');
+      const token =
+        client.handshake.auth?.token ||
+        client.handshake.headers?.authorization?.replace('Bearer', '');
 
-      if (!token){
+      if (!token) {
         client.disconnect();
         return;
       }
@@ -44,7 +45,6 @@ export class BoardGateway implements OnGatewayDisconnect {
 
       client.data.userId = payload.sub;
       client.data.email = payload.email;
-
     } catch (err) {
       client.disconnect();
     }
@@ -53,7 +53,7 @@ export class BoardGateway implements OnGatewayDisconnect {
   // ROOM
   @SubscribeMessage('room:join')
   handleJoinRoom(
-    @MessageBody() data: { boardId: string},
+    @MessageBody() data: { boardId: string },
     @ConnectedSocket() client: Socket,
   ) {
     client.join(data.boardId);
@@ -76,10 +76,7 @@ export class BoardGateway implements OnGatewayDisconnect {
   ) {
     client.leave(data.boardId);
 
-    const online = this.presenceService.removeMember(
-      data.boardId,
-      client.id,
-    );
+    const online = this.presenceService.removeMember(data.boardId, client.id);
 
     this.server.to(data.boardId).emit('presence:update', online);
     client.data.boardId = undefined;

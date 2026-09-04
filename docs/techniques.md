@@ -186,35 +186,40 @@ Tài liệu này là báo cáo kỹ thuật chuyên sâu đối chiếu **trực
 ---
 
 ### 3.3. Kiến Trúc Hướng Sự Kiện (Event-Driven Architecture)
-- **Trạng thái**: **Triển khai dở dang / Chưa hoàn thiện (Partially Implemented / Gap)**
+- **Trạng thái**: **Đang áp dụng (Đã tích hợp hoàn chỉnh)**
 - **Bằng chứng & Phân tích chi tiết**:
-  1. Thư viện `@nestjs/event-emitter: ^3.1.0` đã được cài đặt trong [package.json:27](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/package.json#L27).
-  2. Tại [src/realtime/gateways/board.gateway.ts:127-147](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/realtime/gateways/board.gateway.ts#L127-L147), lớp `BoardGateway` đã khai báo sẵn 4 hàm lắng nghe sự kiện:
-     ```typescript
-     @OnEvent('task.created')
-     handleTaskCreated(payload: { boardId: string; task: unknown }) {
-       this.server.to(payload.boardId).emit('task:created', payload.task);
-     }
+  1. Thư viện `@nestjs/event-emitter: ^3.1.0` được đăng ký toàn cục tại [src/app.module.ts:14](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/app.module.ts#L14) (`EventEmitterModule.forRoot()`).
+  2. **Nơi phát sự kiện (Event Producer)**:
+     - Lớp `TaskService` ([src/task/task.service.ts:8-12](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/task/task.service.ts#L8-L12)) inject `EventEmitter2`.
+     - Bắn sự kiện nội bộ sau khi hoàn thành thao tác C-U-D trong Database:
+       - `this.eventEmitter.emit('task.created', { boardId, task })` khi tạo task mới.
+       - `this.eventEmitter.emit('task.updated', { boardId, task })` khi sửa task.
+       - `this.eventEmitter.emit('task.moved', { boardId, task })` khi di chuyển cột hoặc đổi thứ tự.
+       - `this.eventEmitter.emit('task.deleted', { boardId, taskId })` khi xóa task.
+  3. **Nơi lắng nghe sự kiện (Event Consumer / WebSocket Broadcaster)**:
+     - Lớp `BoardGateway` ([src/realtime/gateways/board.gateway.ts:127-147](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/realtime/gateways/board.gateway.ts#L127-L147)) bắt các sự kiện qua decorator `@OnEvent` và lập tức broadcast xuống toàn bộ client trong phòng WebSocket tương ứng:
+       ```typescript
+       @OnEvent('task.created')
+       handleTaskCreated(payload: { boardId: string; task: unknown }) {
+         this.server.to(payload.boardId).emit('task:created', payload.task);
+       }
 
-     @OnEvent('task.updated')
-     handleTaskUpdated(payload: { boardId: string; task: unknown }) {
-       this.server.to(payload.boardId).emit('task:updated', payload.task);
-     }
+       @OnEvent('task.updated')
+       handleTaskUpdated(payload: { boardId: string; task: unknown }) {
+         this.server.to(payload.boardId).emit('task:updated', payload.task);
+       }
 
-     @OnEvent('task.moved')
-     handleTaskMoved(payload: { boardId: string; task: unknown }) {
-       this.server.to(payload.boardId).emit('task:moved', payload.task);
-     }
+       @OnEvent('task.moved')
+       handleTaskMoved(payload: { boardId: string; task: unknown }) {
+         this.server.to(payload.boardId).emit('task:moved', payload.task);
+       }
 
-     @OnEvent('task.deleted')
-     handleTaskDeleted(payload: { boardId: string; taskId: string }) {
-       this.server.to(payload.boardId).emit('task:deleted', { taskId: payload.taskId });
-     }
-     ```
-  3. **Lỗ hổng mã nguồn thực tế**:
-     - Trong [src/app.module.ts](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/app.module.ts), `EventEmitterModule.forRoot()` **chưa được import**.
-     - Trong [src/task/task.service.ts](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/task/task.service.ts), `EventEmitter2` **chưa được inject**, và các hàm `create()`, `update()`, `move()`, `remove()` hoàn toàn không gọi `this.eventEmitter.emit('task.created', ...)`.
-     - *Hậu quả*: Các sự kiện thay đổi Task qua REST API hiện tại chưa tự động kích hoạt broadcast WebSocket tới các client trong room.
+       @OnEvent('task.deleted')
+       handleTaskDeleted(payload: { boardId: string; taskId: string }) {
+         this.server.to(payload.boardId).emit('task:deleted', { taskId: payload.taskId });
+       }
+       ```
+  - *Ý nghĩa*: Hoàn thiện "cầu nối" phân tách (Decoupling) giữa tầng REST API và tầng WebSocket. `TaskService` không cần phụ thuộc trực tiếp vào `BoardGateway` mà vẫn kích hoạt được việc phát sóng realtime tức thời tới toàn bộ người dùng đang mở bảng Kanban.
 
 ---
 

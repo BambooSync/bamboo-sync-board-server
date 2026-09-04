@@ -17,7 +17,7 @@ export class ColumnService {
   async reorder(boardId: string, dto: ReorderColumnDto) {
     // Cập nhật order hàng loạt trong 1 transaction — đảm bảo không bị lệch nếu có lỗi giữa chừng
     return this.prisma.$transaction(
-      dto.columns.map(col =>
+      dto.columns.map((col) =>
         this.prisma.column.update({
           where: { id: col.id },
           data: { order: col.order },
