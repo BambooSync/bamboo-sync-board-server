@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./docs/banner.jpg" alt="BambooSync — Board Server API" width="100%" />
+  <img src="./assets/banner.jpg" alt="BambooSync — Board Server API" width="100%" />
 </p>
 
 <br/>
@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/NestJS-11.x-E0234E?style=flat-square&logo=nestjs&logoColor=white" alt="NestJS" />
   <img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Prisma-6.x-2D3748?style=flat-square&logo=prisma&logoColor=white" alt="Prisma" />
-  <img src="https://img.shields.io/badge/PostgreSQL-Latest-336791?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/PostgreSQL-16-336791?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL" />
   <img src="https://img.shields.io/badge/Socket.IO-4.x-010101?style=flat-square&logo=socket.io&logoColor=white" alt="Socket.IO" />
   <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker" />
   <img src="https://img.shields.io/badge/License-UNLICENSED-lightgrey?style=flat-square" alt="License" />
@@ -18,297 +18,195 @@
 
 ---
 
-## Giới thiệu
+## 1. Giới thiệu
 
-**BambooSync** là một ứng dụng quản lý bảng công việc theo thời gian thực (Kanban-style), được xây dựng theo kiến trúc RESTful API kết hợp WebSocket. Đây là phần **Backend Server** của hệ thống, chịu trách nhiệm xử lý toàn bộ logic nghiệp vụ, xác thực người dùng, quản lý dữ liệu và phát sóng sự kiện thời gian thực.
+**BambooSync Server** là thành phần Backend cốt lõi thuộc hệ sinh thái ứng dụng quản lý bảng công việc cộng tác theo thời gian thực (**BambooSync Kanban**). 
 
-Dự án sử dụng **NestJS** làm framework chính với **TypeScript**, kết hợp **Prisma ORM** để tương tác với cơ sở dữ liệu **PostgreSQL**, và **Socket.IO** để xử lý kết nối thời gian thực.
-
----
-
-## Mục lục
-
-- [Công nghệ sử dụng](#công-nghệ-sử-dụng)
-- [Kiến trúc hệ thống](#kiến-trúc-hệ-thống)
-- [Cấu trúc dự án](#cấu-trúc-dự-án)
-- [Yêu cầu môi trường](#yêu-cầu-môi-trường)
-- [Cài đặt và chạy dự án](#cài-đặt-và-chạy-dự-án)
-- [Biến môi trường](#biến-môi-trường)
-- [Cơ sở dữ liệu](#cơ-sở-dữ-liệu)
-- [Chạy kiểm thử](#chạy-kiểm-thử)
-- [Triển khai với Docker](#triển-khai-với-docker)
+Hệ thống chịu trách nhiệm:
+- Cung cấp giao diện **RESTful API** cho các thao tác quản trị dữ liệu (xác thực người dùng, quản lý bảng công việc, cột trạng thái và thẻ công việc).
+- Cung cấp cổng **WebSocket (Socket.IO Gateway)** phục vụ các tính năng cộng tác trực tiếp: đồng bộ con trỏ chuột thời gian thực (cursor tracking), chỉ báo đang soạn thảo (typing indicator) và danh sách thành viên trực tuyến (realtime presence).
+- Đảm bảo tính toàn vẹn và nhất quán của dữ liệu nghiệp vụ thông qua cơ chế khóa ngoại và transaction của cơ sở dữ liệu PostgreSQL.
 
 ---
 
-## Công nghệ sử dụng
+## 2. Tech Stack
 
-| Thành phần        | Công nghệ              | Phiên bản  |
-|-------------------|------------------------|------------|
-| Framework         | NestJS                 | ^11.0      |
-| Ngôn ngữ          | TypeScript             | ^5.7       |
-| ORM               | Prisma Client          | ^6.19      |
-| Cơ sở dữ liệu     | PostgreSQL              | Latest     |
-| Xác thực          | JWT + Passport         | —          |
-| Realtime          | Socket.IO              | ^4.8       |
-| Mã hóa mật khẩu  | bcrypt                 | ^6.0       |
-| Xác thực dữ liệu  | class-validator        | ^0.15      |
-| Package Manager   | pnpm                   | Latest     |
-| Container         | Docker + Compose       | —          |
-
----
-
-## Kiến trúc hệ thống
-
-```
-Client (Frontend / Mobile)
-        |
-        |  HTTP (REST API) / WebSocket
-        v
-+---------------------------+
-|     BambooSync Server     |
-|  (NestJS Application)     |
-+---------------------------+
-|                           |
-|  Auth Module              |  -- JWT Access Token + Refresh Token
-|  Board Module             |  -- CRUD bảng công việc
-|  Column Module            |  -- CRUD cột trong bảng
-|  Task Module              |  -- CRUD task, priority, due date
-|  Realtime Module          |  -- Socket.IO Gateway
-|  Activity Log             |  -- Theo dõi hành động người dùng
-|                           |
-+---------------------------+
-           |
-           | Prisma ORM
-           v
-+---------------------------+
-|       PostgreSQL          |
-+---------------------------+
-```
+| Thành phần | Công nghệ | Phiên bản | Ghi chú & Vai trò |
+|------------|-----------|-----------|-------------------|
+| **Ngôn ngữ** | TypeScript | ^5.7.3 | Ngôn ngữ phát triển chính |
+| **Framework** | NestJS | ^11.0.1 | Kiến trúc ứng dụng Modular Monolith |
+| **ORM** | Prisma ORM | ^6.19.3 | Quản lý schema, migrations và truy vấn SQL an toàn |
+| **Cơ sở dữ liệu** | PostgreSQL | 16-alpine | Lưu trữ dữ liệu quan hệ chính |
+| **Giao tiếp Thời gian thực** | Socket.IO / `@nestjs/websockets` | ^4.8.3 | Quản lý kết nối hai chiều WebSocket |
+| **Xác thực & Bảo mật** | Passport, Passport-JWT, bcrypt | ^0.7 / ^6.0 | Xác thực Bearer Token (JWT) và mã hóa mật khẩu |
+| **Xác thực Dữ liệu** | class-validator, class-transformer | ^0.15 / ^0.5 | Kiểm tra định dạng dữ liệu đầu vào (DTOs) |
+| **Container & Orchestration**| Docker & Docker Compose | — | Đóng gói môi trường và chạy cụm DB phụ trợ |
+| **Message Queue / Cache** | Redis (Docker Compose) | 7-alpine | Đã cấu hình container trong Compose, sẵn sàng tích hợp |
 
 ---
 
-## Cấu trúc dự án
+## 3. Yêu Cầu Môi Trường (Prerequisites)
 
-```
-server/
-├── src/
-│   ├── auth/               # Xác thực: đăng nhập, đăng ký, refresh token
-│   ├── board/              # Quản lý bảng (Board): tạo, sửa, xoá, invite
-│   ├── collumn/            # Quản lý cột (Column) trong bảng
-│   ├── task/               # Quản lý task: CRUD, priority, due date
-│   ├── realtime/           # WebSocket Gateway (Socket.IO)
-│   ├── prisma/             # PrismaService và module kết nối DB
-│   ├── common/             # Guards, decorators, filters dùng chung
-│   ├── app.module.ts       # Module gốc của ứng dụng
-│   └── main.ts             # Điểm khởi động ứng dụng
-├── prisma/
-│   ├── schema.prisma       # Định nghĩa schema cơ sở dữ liệu
-│   └── migrations/         # Lịch sử migration
-├── test/                   # E2E tests
-├── docs/                   # Tài liệu và tài nguyên tĩnh
-├── Dockerfile              # Cấu hình Docker build
-├── docker-compose.yml      # Cấu hình Docker Compose
-├── .env.example            # Mẫu biến môi trường
-└── package.json
-```
+Trước khi cài đặt và chạy ứng dụng, hãy đảm bảo môi trường phát triển của bạn đã cài đặt các công cụ sau:
 
----
-
-## Yêu cầu môi trường
-
-Trước khi cài đặt, hãy đảm bảo máy đã có:
-
-- **Node.js** >= 20.x
-- **pnpm** >= 9.x — nếu chưa có, cài bằng lệnh:
+- **Node.js**: Phiên bản `>= 20.x` (khuyến nghị bản LTS).
+- **pnpm**: Phiên bản `>= 9.x` (Package manager chính của repo). Cài đặt qua lệnh:
   ```bash
   npm install -g pnpm
   ```
-- **PostgreSQL** >= 15 (hoặc chạy qua Docker)
-- **Docker** (tuỳ chọn, nếu dùng container)
+- **PostgreSQL**: Phiên bản `>= 15.x` hoặc `>= 16.x` (khuyến nghị chạy trực tiếp qua Docker Compose có sẵn trong repo).
+- **Docker & Docker Compose**: Dùng để khởi chạy cụm dịch vụ phụ trợ (PostgreSQL 16 và Redis 7) hoặc chạy container ứng dụng.
 
 ---
 
-## Cài đặt và chạy dự án
+## 4. Hướng Dẫn Cài Đặt & Chạy Local Từng Bước
 
-### 1. Clone repository
-
+### Bước 1: Clone repository và chuyển vào thư mục server
 ```bash
 git clone <repository-url>
-cd server
+cd BambooSync/server
 ```
 
-### 2. Cài đặt dependencies
-
+### Bước 2: Cài đặt các gói phụ thuộc (Dependencies)
 ```bash
 pnpm install
 ```
 
-### 3. Cấu hình biến môi trường
-
-Sao chép file mẫu và điền thông tin thực tế:
-
+### Bước 3: Cấu hình biến môi trường
+Tạo file `.env` từ file mẫu `.env.example`:
 ```bash
 cp .env.example .env
 ```
+Điền các giá trị thích hợp cho `.env` (tham khảo mục [Biến Môi Trường](#5-danh-sách-biến-môi-trường)).
 
-Chỉnh sửa file `.env` theo hướng dẫn ở phần [Biến môi trường](#biến-môi-trường).
-
-### 4. Khởi tạo cơ sở dữ liệu
-
+### Bước 4: Khởi động cơ sở dữ liệu phụ trợ
+Khởi chạy PostgreSQL và Redis bằng Docker Compose:
 ```bash
-# Tạo bảng theo schema (lần đầu)
+docker-compose up -d
+```
+*(Lưu ý: PostgreSQL chạy trên cổng host `5433:5432`, khớp với cấu hình trong `.env`)*.
+
+### Bước 5: Đồng bộ hóa cơ sở dữ liệu và sinh Prisma Client
+```bash
+# Áp dụng migrations vào database
 pnpm prisma migrate dev
 
-# Tạo Prisma Client
+# Sinh mã nguồn TypeScript cho Prisma Client
 pnpm prisma generate
 ```
 
-### 5. Chạy ứng dụng
-
+### Bước 6: Khởi động server
 ```bash
-# Chế độ development (tự động reload khi code thay đổi)
+# Chế độ phát triển (Development với tính năng tự động reload khi sửa code)
 pnpm run start:dev
 
-# Chế độ production
-pnpm run start:prod
-
-# Chế độ thông thường
+# Hoặc chế độ thông thường
 pnpm run start
+
+# Hoặc chế độ Production (sau khi build)
+pnpm run build
+pnpm run start:prod
 ```
 
-Sau khi khởi động, server sẽ lắng nghe tại:
-```
-http://localhost:3000
+Server sẽ lắng nghe tại: **`http://localhost:3000`** (hoặc port được định cấu hình).
+
+Kiểm tra trạng thái server:
+```bash
+curl http://localhost:3000/health
+# Phản hồi: {"status":"ok","userCount":0}
 ```
 
 ---
 
-## Biến môi trường
+## 5. Danh Sách Biến Môi Trường (Environment Variables)
 
-Tạo file `.env` ở thư mục gốc dự án với nội dung sau:
+Các biến môi trường được định nghĩa tại file `.env` (dựa theo `.env.example` và mã nguồn thực tế):
 
-```env
-# Chuỗi kết nối PostgreSQL
-# Cú pháp: postgresql://USER:PASSWORD@HOST:PORT/DATABASE_NAME
-DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/bamboosync
+| Tên Biến | Bắt Buộc | Giá Trị Mặc Định / Mẫu | Ý Nghĩa & Hướng Dẫn |
+|----------|----------|------------------------|---------------------|
+| `PORT` | Không | `3000` | Cổng lắng nghe HTTP & WebSocket của server |
+| `DATABASE_URL` | **Có** | `postgresql://bamboo:bamboo123@127.0.0.1:5433/bamboosyncboard?schema=public` | Chuỗi kết nối PostgreSQL dùng bởi Prisma ORM |
+| `JWT_ACCESS_SECRET` | **Có** | `your_super_secret_access_key` | Khóa bí mật dùng để ký và giải mã JWT Access Token |
+| `JWT_REFRESH_SECRET` | **Có** | `your_super_secret_refresh_key` | Khóa bí mật dùng để ký và giải mã JWT Refresh Token |
+| `JWT_ACCESS_EXPIRES_IN`| **Có** | `15m` | Thời gian sống của Access Token (ví dụ: `15m`, `1h`, `1d`) |
+| `JWT_REFRESH_EXPIRES_IN`| **Có** | `7d` | Thời gian sống của Refresh Token (ví dụ: `7d`, `30d`) |
 
-# Khoá bí mật để ký Access Token (JWT)
-# Nên dùng chuỗi ngẫu nhiên dài ít nhất 32 ký tự
-JWT_ACCESS_SECRET=your_access_secret_key_here
-
-# Khoá bí mật để ký Refresh Token (JWT)
-# Nên khác với JWT_ACCESS_SECRET
-JWT_REFRESH_SECRET=your_refresh_secret_key_here
-
-# Thời gian hết hạn của Access Token
-# Ví dụ: 15m (15 phút), 1h (1 giờ), 1d (1 ngày)
-JWT_ACCESS_EXPIRES_IN=15m
-
-# Thời gian hết hạn của Refresh Token
-# Ví dụ: 7d (7 ngày), 30d (30 ngày)
-JWT_REFRESH_EXPIRES_IN=7d
-```
-
-> **Lưu ý bảo mật:** Không bao giờ commit file `.env` lên repository. File này đã được thêm vào `.gitignore`.
+> [!CAUTION]
+> Tuyệt đối **không commit file `.env`** chứa thông tin nhạy cảm lên Git repository. File này đã được thêm vào `.gitignore`.
 
 ---
 
-## Cơ sở dữ liệu
+## 6. Cách Chạy Kiểm Thử (Testing)
 
-Dự án sử dụng **Prisma ORM** với **PostgreSQL**. Dưới đây là tóm tắt các model chính:
-
-| Model         | Mô tả                                                          |
-|---------------|----------------------------------------------------------------|
-| `User`        | Tài khoản người dùng (email, mật khẩu, avatar, role)          |
-| `Board`       | Bảng công việc (tên, mô tả, invite code, public/private)      |
-| `BoardMember` | Thành viên trong bảng (hỗ trợ cả guest không cần tài khoản)   |
-| `Column`      | Cột trong bảng (tên, thứ tự)                                   |
-| `Task`        | Công việc (tiêu đề, mô tả, độ ưu tiên, ngày đến hạn)         |
-| `ActivityLog` | Nhật ký hoạt động (theo dõi mọi thao tác trên bảng)           |
-
-### Các lệnh Prisma thường dùng
+Dự án được cấu hình kiểm thử bằng **Jest** và **Supertest**:
 
 ```bash
-# Tạo migration mới sau khi thay đổi schema
-pnpm prisma migrate dev --name ten_migration
-
-# Áp dụng migration lên production (không tạo migration mới)
-pnpm prisma migrate deploy
-
-# Mở Prisma Studio — giao diện quản lý dữ liệu trực quan
-pnpm prisma studio
-
-# Cập nhật lại Prisma Client sau khi thay đổi schema
-pnpm prisma generate
-
-# Kiểm tra schema có hợp lệ không
-pnpm prisma validate
-```
-
----
-
-## Chạy kiểm thử
-
-```bash
-# Chạy unit tests
+# Chạy toàn bộ Unit Tests
 pnpm run test
 
-# Chạy unit tests ở chế độ watch (tự chạy lại khi code thay đổi)
+# Chạy Unit Tests ở chế độ Watch (tự chạy lại khi file thay đổi)
 pnpm run test:watch
 
-# Chạy end-to-end tests
+# Xem báo cáo độ bao phủ mã nguồn (Code Coverage)
+pnpm run test:cov
+
+# Chạy kiểm thử tích hợp End-to-End (E2E)
 pnpm run test:e2e
 
-# Xem báo cáo độ phủ (code coverage)
-pnpm run test:cov
+# Chạy test ở chế độ debug
+pnpm run test:debug
 ```
 
 ---
 
-## Triển khai với Docker
+## 7. Cấu Trúc Thư Mục Dự Án (Project Structure)
 
-Dự án đã được cấu hình sẵn để chạy với Docker.
-
-### Chạy toàn bộ stack (Server + PostgreSQL)
-
-```bash
-# Build image và khởi động tất cả container
-docker-compose up --build
-
-# Chạy ở nền (detached mode)
-docker-compose up --build -d
-
-# Dừng tất cả container
-docker-compose down
-
-# Dừng và xoá cả volume dữ liệu (cẩn thận — xoá toàn bộ dữ liệu DB)
-docker-compose down -v
 ```
-
-### Build image độc lập
-
-```bash
-# Build Docker image
-docker build -t bamboosync-server .
-
-# Chạy container
-docker run -p 3000:3000 --env-file .env bamboosync-server
+server/
+├── assets/                     # Tài nguyên hình ảnh tĩnh (banner, logo)
+├── docs/                       # BỘ TÀI LIỆU KỸ THUẬT ĐẦY ĐỦ
+│   ├── architecture.md         # Kiến trúc hệ thống, data flow & module design
+│   ├── api.md                  # Tài liệu chi tiết HTTP API & WebSocket events
+│   ├── database.md             # Schema DB, quan hệ thực thể (ERD) & migrations
+│   ├── CONTRIBUTING.md         # Quy tắc code style, git flow & review checklist
+│   ├── deployment.md           # Hướng dẫn build Docker, compose & vận hành
+│   └── techniques.md           # Báo cáo đối chiếu kỹ thuật & patterns thực tế
+├── prisma/
+│   ├── schema.prisma           # Định nghĩa cấu trúc Schema và Models của Prisma
+│   └── migrations/             # Lịch sử các bản migration SQL đã sinh
+├── src/
+│   ├── auth/                   # Module xác thực: Đăng ký, đăng nhập, JWT Passport Strategy
+│   ├── board/                  # Module quản lý Bảng: CRUD, phân quyền & mã mời
+│   ├── collumn/                # Module quản lý Cột: Thêm, xóa và sắp xếp thứ tự (reorder)
+│   ├── task/                   # Module quản lý Công việc: CRUD, di chuyển cột & đổi thứ tự
+│   ├── realtime/               # Module thời gian thực: Socket.IO Gateway & Presence Service
+│   ├── common/                 # Tiện ích dùng chung: JwtAuthGuard, CurrentUser Decorator
+│   ├── prisma/                 # PrismaService & PrismaModule kết nối Database
+│   ├── app.controller.ts       # Controller gốc (chứa endpoint /health)
+│   ├── app.module.ts           # Root Module của ứng dụng NestJS
+│   ├── app.service.ts          # Root Service
+│   └── main.ts                 # Điểm khởi động ứng dụng (Bootstrap)
+├── test/                       # Cấu hình và kịch bản kiểm thử End-to-End (E2E)
+├── .env.example                # Mẫu cấu hình biến môi trường
+├── docker-compose.yml          # Cấu hình dịch vụ Docker (PostgreSQL 16 & Redis 7)
+├── Dockerfile                  # Cấu hình Multi-stage Docker Build cho Production
+├── eslint.config.mjs           # Cấu hình linter ESLint 9 Flat Config
+├── package.json                # Định nghĩa dependencies và scripts chạy dự án
+└── tsconfig.json               # Cấu hình TypeScript compiler
 ```
 
 ---
 
-## Quy trình phát triển
+## 8. Tài Liệu Kỹ Thuật Chi Tiết (Documentation Index)
 
-```bash
-# Format code
-pnpm run format
+Để tìm hiểu sâu hơn về từng khía cạnh kỹ thuật, vui lòng tham khảo các tài liệu chuyên biệt trong thư mục `/docs`:
 
-# Kiểm tra linting
-pnpm run lint
-
-# Build production bundle
-pnpm run build
-```
+1. [docs/architecture.md](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/docs/architecture.md): Sơ đồ luồng dữ liệu, cấu trúc module, luồng xác thực và các quyết định thiết kế cốt lõi.
+2. [docs/api.md](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/docs/api.md): Danh mục toàn bộ HTTP REST Endpoints, WebSocket Events, Request/Response payloads và mã lỗi.
+3. [docs/database.md](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/docs/database.md): Schema 6 bảng dữ liệu, sơ đồ ERD trực quan, các kiểu Enums và quy trình migration.
+4. [docs/CONTRIBUTING.md](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/docs/CONTRIBUTING.md): Hướng dẫn viết mã, chuẩn format Prettier, cấu hình ESLint, quy ước nhánh và commit.
+5. [docs/deployment.md](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/docs/deployment.md): Hướng dẫn đóng gói Multi-stage Docker, vận hành với Docker Compose, cấu hình môi trường và rollback.
+6. [docs/techniques.md](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/docs/techniques.md): Báo cáo đối chiếu 4 nhóm kỹ thuật backend (Database, Caching, Async/Distributed, Patterns) kèm trích dẫn dòng code thực tế và phân tích khoảng trống kỹ thuật.
 
 ---
 

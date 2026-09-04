@@ -5,36 +5,64 @@ import {
   MessageBody,
   ConnectedSocket,
   OnGatewayDisconnect,
+  OnGatewayConnection
 } from '@nestjs/websockets';
 
 import { OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
 import { PresenceService } from '../services/presence.service';
+import { TaskService } from 'src/task/task.service';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 @WebSocketGateway({
   cors: { origin: '*' },
 })
+
 export class BoardGateway implements OnGatewayDisconnect {
   @WebSocketServer()
   server!: Server;
 
-  constructor(private readonly presenceService: PresenceService) {}
+  constructor(
+    private readonly presenceService: PresenceService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService
+  ) {}
+
+  async handleConnection(client: Socket) {
+    try {
+      const token = client.handshake.auth?.token || client.handshake.headers?.authorization?.replace('Bearer', '');
+
+      if (!token){
+        client.disconnect();
+        return;
+      }
+
+      const payload = await this.jwtService.verifyAsync(token, {
+        secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
+      });
+
+      client.data.userId = payload.sub;
+      client.data.email = payload.email;
+
+    } catch (err) {
+      client.disconnect();
+    }
+  }
 
   // ROOM
   @SubscribeMessage('room:join')
   handleJoinRoom(
-    @MessageBody() data: { boardId: string; userId: string; email: string },
+    @MessageBody() data: { boardId: string},
     @ConnectedSocket() client: Socket,
   ) {
     client.join(data.boardId);
 
     client.data.boardId = data.boardId;
-    client.data.userId = data.userId;
-    client.data.email = data.email;
 
     const online = this.presenceService.addMember(data.boardId, {
-      userId: data.userId,
-      email: data.email,
+      userId: client.data.userId!,
+      email: client.data.email!,
       socketId: client.id,
     });
 
