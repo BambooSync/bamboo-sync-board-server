@@ -12,13 +12,13 @@ Dự án sử dụng cơ chế **Multi-stage Docker Build** (`Dockerfile`) nhằ
 
 ```dockerfile
 #=================STAGE 1: BUILD=====================
-FROM node:20-alpine AS BUILDER
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-RUN npm install -g pnpm
+RUN npm install -g pnpm@9
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
@@ -28,7 +28,7 @@ RUN npx prisma generate
 RUN pnpm run build
 
 #=================STAGE 2: PRODUCTION=================
-FROM node:20-alpine AS PRODUCTION
+FROM node:22-alpine AS production
 
 WORKDIR /app
 
@@ -44,8 +44,8 @@ EXPOSE 3000
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
 ```
 
-- **Giai đoạn 1 (`BUILDER`)**: Sử dụng base image `node:20-alpine`, cài đặt `pnpm`, cài đặt đầy đủ `devDependencies`, sinh mã nguồn Prisma Client (`npx prisma generate`) và biên dịch TypeScript sang JavaScript (`dist/`).
-- **Giai đoạn 2 (`PRODUCTION`)**: Chỉ sao chép các thành phần cần thiết (`dist`, `node_modules`, `prisma`, `package.json`), loại bỏ toàn bộ mã nguồn TypeScript gốc và công cụ dev.
+- **Giai đoạn 1 (`builder`)**: Sử dụng base image `node:22-alpine`, cài đặt `pnpm@9`, cài đặt đầy đủ `devDependencies`, sinh mã nguồn Prisma Client (`npx prisma generate`) và biên dịch TypeScript sang JavaScript (`dist/`).
+- **Giai đoạn 2 (`production`)**: Chỉ sao chép các thành phần cần thiết (`dist`, `node_modules`, `prisma`, `package.json`), loại bỏ toàn bộ mã nguồn TypeScript gốc và công cụ dev.
 - **Entrypoint**: Tự động chạy `npx prisma migrate deploy` trước khi khởi động tiến trình Node.js (`node dist/main`) để đảm bảo schema database luôn đồng bộ với mã nguồn mới nhất.
 
 ---
@@ -99,52 +99,23 @@ Bảng phân định sự khác biệt về tham số cấu hình giữa các m�
 
 ## 4. Tự Động Hóa CI/CD (Continuous Integration & Delivery)
 
-> [!WARNING]
-> Hiện trạng codebase: **Chưa có cấu hình CI/CD tự động trong repo** (không tìm thấy thư mục `.github/workflows`).
+Dự án đã được tích hợp quy trình **GitHub Actions CI Pipeline** tại [.github/workflows/ci.yml](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/.github/workflows/ci.yml) nhằm tự động kiểm tra chất lượng mã nguồn trên mỗi lượt `push` hoặc `pull_request` ở mọi nhánh (`'**'`).
 
-[TODO: cần bổ sung] Đề xuất cấu hình mẫu GitHub Actions (`.github/workflows/ci.yml`) để tự động kiểm thử và build Docker image:
+### 4.1. Kiến Trúc CI Pipeline
 
-```yaml
-name: CI/CD Pipeline
+Quy trình CI bao gồm 2 công việc (jobs) độc lập:
 
-on:
-  push:
-    branches: [ main, dev ]
-  pull_request:
-    branches: [ main, dev ]
+1. **`lint-and-test`**:
+   - Khởi tạo service container **PostgreSQL 16** với health check `pg_isready`.
+   - Cài đặt `pnpm 9` và `Node.js 22` có bộ nhớ đệm (cache dependencies).
+   - Xác thực schema (`pnpm prisma validate`) và sinh Prisma Client (`pnpm prisma generate`).
+   - Kiểm tra phong cách mã nguồn qua ESLint (`pnpm run lint`).
+   - Chạy migration database trên container (`pnpm prisma migrate deploy`).
+   - Biên dịch TypeScript (`pnpm run build`).
+   - Chạy kiểm thử Unit test (`pnpm run test`) và End-to-End (`pnpm run test:e2e`).
 
-jobs:
-  lint-and-test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 9
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Check Linting
-        run: pnpm run lint
-
-      - name: Prisma Generate
-        run: pnpm prisma generate
-
-      - name: Build TypeScript
-        run: pnpm run build
-
-      - name: Run Tests
-        run: pnpm run test
-```
+2. **`docker-build`** *(chạy sau khi `lint-and-test` thành công)*:
+   - Sử dụng Docker Buildx để kiểm tra tính toàn vẹn của tiến trình đóng gói multi-stage container từ [Dockerfile](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/Dockerfile).
 
 ---
 
