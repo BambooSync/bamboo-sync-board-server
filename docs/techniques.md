@@ -240,7 +240,7 @@ Tài liệu này là báo cáo kỹ thuật chuyên sâu đối chiếu **trực
 
 | Pattern Kỹ Thuật | Trạng Thái | Ghi Chú & Bằng Chứng Mã Nguồn |
 |------------------|------------|-------------------------------|
-| **Rate Limiting** | **Chưa áp dụng** | Chưa tích hợp `@nestjs/throttler` để chống spam API hoặc brute-force mật khẩu. |
+| **Rate Limiting** | **Đang áp dụng (Redis-Backed Distributed Throttler)** | Tích hợp `@nestjs/throttler` và `@nest-lab/throttler-storage-redis` trong [src/app.module.ts](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/app.module.ts). Giới hạn mặc định toàn cục 60 req/phút, siết chặt 5 req/phút cho Auth (`/auth/login`, `/auth/register`) tại [src/auth/auth.controller.ts](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/auth/auth.controller.ts). Sử dụng `RedisThrottlerGuard` ([src/common/guards/redis-throttler.guard.ts](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/common/guards/redis-throttler.guard.ts)) với graceful degradation nếu Redis gặp sự cố. |
 | **Circuit Breaker** | **Chưa áp dụng** | Không có cơ chế ngắt mạch tự động khi database hoặc dịch vụ ngoài gặp sự cố. |
 | **Retry / Backoff** | **Chưa áp dụng** | Chưa cấu hình retry chính sách với hàm bọc hoặc interceptor. |
 | **Idempotency Key** | **Chưa áp dụng** | Các thao tác tạo mới (`POST /boards`, `POST /tasks`) chưa hỗ trợ Header khóa chống tạo trùng lặp. |

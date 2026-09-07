@@ -26,7 +26,26 @@ describe('AppController (e2e)', () => {
       });
   });
 
+  it('should rate limit /auth/login after 5 attempts with 429 Too Many Requests', async () => {
+    const server = app.getHttpServer();
+    for (let i = 0; i < 5; i++) {
+      await request(server)
+        .post('/auth/login')
+        .send({ email: 'ratelimit_test@example.com', password: 'wrongpassword' })
+        .expect((res) => {
+          expect(res.status).not.toBe(429);
+        });
+    }
+
+    // 6th attempt must be rejected with 429
+    await request(server)
+      .post('/auth/login')
+      .send({ email: 'ratelimit_test@example.com', password: 'wrongpassword' })
+      .expect(429);
+  });
+
   afterEach(async () => {
     await app.close();
   });
 });
+

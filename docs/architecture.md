@@ -21,6 +21,7 @@ graph TB
     end
 
     subgraph Security["Security & Middleware Layer"]
+        ThrottlerGuard["RedisThrottlerGuard (Rate Limiting)"]
         JwtGuard["JwtAuthGuard (Passport JWT)"]
         WsAuth["WS Handshake Auth (JWT Verify)"]
         ValidationPipe["Class Validator & Transformer"]
@@ -40,7 +41,7 @@ graph TB
     subgraph StateAndStorage["Data & State Layer"]
         InMemoryState["Presence State (In-Memory Map)"]
         Postgres[("PostgreSQL 16 Database")]
-        RedisContainer[("Redis 7 (Cache & Pub/Sub Adapter)")]
+        RedisContainer[("Redis 7 (Cache, Pub/Sub & Throttler)")]
     end
 
     WebClient -->|HTTP REST| HttpEntry
@@ -48,7 +49,8 @@ graph TB
     WebClient -->|WebSocket WSS| WsEntry
     MobileClient -->|WebSocket WSS| WsEntry
 
-    HttpEntry --> ValidationPipe --> JwtGuard
+    HttpEntry --> ValidationPipe --> ThrottlerGuard --> JwtGuard
+    ThrottlerGuard -->|Counter & Limit| RedisContainer
     WsEntry --> WsAuth
 
     JwtGuard --> AuthMod
