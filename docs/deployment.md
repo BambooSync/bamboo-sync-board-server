@@ -108,8 +108,8 @@ Quy trình CI bao gồm 2 công việc (jobs) độc lập:
 1. **`lint-and-test`**:
    - Khởi tạo service container **PostgreSQL 16** với health check `pg_isready`.
    - Cài đặt `pnpm 9` và `Node.js 22` có bộ nhớ đệm (cache dependencies).
-   - Kiểm tra phong cách mã nguồn qua ESLint (`pnpm run lint`).
    - Xác thực schema (`pnpm prisma validate`) và sinh Prisma Client (`pnpm prisma generate`).
+   - Kiểm tra phong cách mã nguồn qua ESLint (`pnpm run lint`).
    - Chạy migration database trên container (`pnpm prisma migrate deploy`).
    - Biên dịch TypeScript (`pnpm run build`).
    - Chạy kiểm thử Unit test (`pnpm run test`) và End-to-End (`pnpm run test:e2e`).

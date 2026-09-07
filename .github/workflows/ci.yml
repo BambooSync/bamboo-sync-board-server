@@ -53,14 +53,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run ESLint
-        run: pnpm run lint
-
       - name: Validate Prisma schema
         run: pnpm prisma validate
 
       - name: Generate Prisma Client
         run: pnpm prisma generate
+
+      - name: Run ESLint
+        run: pnpm run lint
 
       - name: Apply Database Migrations
         run: pnpm prisma migrate deploy
