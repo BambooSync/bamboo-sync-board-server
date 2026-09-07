@@ -21,13 +21,17 @@ Tài liệu này là báo cáo kỹ thuật chuyên sâu đối chiếu **trực
        - Migration SQL: [prisma/migrations/20260815004925_init/migration.sql:103](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/prisma/migrations/20260815004925_init/migration.sql#L103) (`CREATE UNIQUE INDEX "board_members_boardId_userId_key" ON "board_members"("boardId", "userId");`)
   2. **Chỉ mục khóa chính (Primary Key Indexes)**:
      - Tự động tạo B-tree index trên cột `id` cho 6 bảng: `users_pkey`, `boards_pkey`, `board_members_pkey`, `columns_pkey`, `tasks_pkey`, `activity_logs_pkey`.
+  3. **Chỉ mục khóa ngoại (Non-Unique Foreign Key Indexes)**:
+     - Bảng `tasks`, cột `columnId`:
+       - Schema: [prisma/schema.prisma:104](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/prisma/schema.prisma#L104) (`@@index([columnId])`)
+       - Migration SQL: [prisma/migrations/20260907024640_add_task_column_id_index/migration.sql:2](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/prisma/migrations/20260907024640_add_task_column_id_index/migration.sql#L2) (`CREATE INDEX "tasks_columnId_idx" ON "tasks"("columnId");`)
+       - *Mục đích*: Tối ưu hóa tốc độ truy vấn danh sách task theo cột khi nạp Kanban Board (`WHERE "columnId" IN (...)`), tăng tốc đếm số task và hỗ trợ xử lý cascade delete từ cột.
 - **Khoảng trống (Gap) cần cải thiện**:
-  - Các cột khóa ngoại thường xuyên dùng để lọc (`WHERE`) và kết nối (`JOIN`) như:
-    - `tasks.columnId`
+  - Các cột khóa ngoại khác thường xuyên dùng để lọc (`WHERE`) và kết nối (`JOIN`) như:
     - `columns.boardId`
     - `boards.ownerId`
     - `activity_logs.boardId`
-  hiện **chưa được đánh index riêng biệt (non-unique index)** qua `@@index([columnId])` trong `prisma/schema.prisma`. Khi số lượng task và log tăng cao, các truy vấn lấy danh sách sẽ phải quét toàn bảng (Sequential Scan).
+  hiện **chưa được đánh index riêng biệt (non-unique index)**. Khi dữ liệu mở rộng, có thể cân nhắc bổ sung index tương tự như đã làm với `tasks.columnId`.
 
 ---
 

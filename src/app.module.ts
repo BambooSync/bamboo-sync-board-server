@@ -12,7 +12,7 @@ import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot(),
+    ConfigModule.forRoot({ isGlobal: true }),
     EventEmitterModule.forRoot(),
     PrismaModule,
     AuthModule,
