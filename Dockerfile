@@ -1,11 +1,11 @@
 #=================STAGE 1: BUILD=====================
-FROM node:20-alpine AS BUILDER
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-RUN npm install -g pnpm
+RUN npm install -g pnpm@9
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
@@ -15,7 +15,7 @@ RUN npx prisma generate
 RUN pnpm run build
 
 #=================STAGE 2: PRODUCTION=================
-FROM node:20-alpine AS PRODUCTION
+FROM node:22-alpine AS production
 
 WORKDIR /app
 

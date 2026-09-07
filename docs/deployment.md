@@ -12,13 +12,13 @@ Dự án sử dụng cơ chế **Multi-stage Docker Build** (`Dockerfile`) nhằ
 
 ```dockerfile
 #=================STAGE 1: BUILD=====================
-FROM node:20-alpine AS BUILDER
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-RUN npm install -g pnpm
+RUN npm install -g pnpm@9
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
@@ -28,7 +28,7 @@ RUN npx prisma generate
 RUN pnpm run build
 
 #=================STAGE 2: PRODUCTION=================
-FROM node:20-alpine AS PRODUCTION
+FROM node:22-alpine AS production
 
 WORKDIR /app
 
@@ -44,8 +44,8 @@ EXPOSE 3000
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
 ```
 
-- **Giai đoạn 1 (`BUILDER`)**: Sử dụng base image `node:20-alpine`, cài đặt `pnpm`, cài đặt đầy đủ `devDependencies`, sinh mã nguồn Prisma Client (`npx prisma generate`) và biên dịch TypeScript sang JavaScript (`dist/`).
-- **Giai đoạn 2 (`PRODUCTION`)**: Chỉ sao chép các thành phần cần thiết (`dist`, `node_modules`, `prisma`, `package.json`), loại bỏ toàn bộ mã nguồn TypeScript gốc và công cụ dev.
+- **Giai đoạn 1 (`builder`)**: Sử dụng base image `node:22-alpine`, cài đặt `pnpm@9`, cài đặt đầy đủ `devDependencies`, sinh mã nguồn Prisma Client (`npx prisma generate`) và biên dịch TypeScript sang JavaScript (`dist/`).
+- **Giai đoạn 2 (`production`)**: Chỉ sao chép các thành phần cần thiết (`dist`, `node_modules`, `prisma`, `package.json`), loại bỏ toàn bộ mã nguồn TypeScript gốc và công cụ dev.
 - **Entrypoint**: Tự động chạy `npx prisma migrate deploy` trước khi khởi động tiến trình Node.js (`node dist/main`) để đảm bảo schema database luôn đồng bộ với mã nguồn mới nhất.
 
 ---
