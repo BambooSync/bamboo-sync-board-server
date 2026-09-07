@@ -5,13 +5,11 @@ import {
   MessageBody,
   ConnectedSocket,
   OnGatewayDisconnect,
-  OnGatewayConnection,
 } from '@nestjs/websockets';
 
 import { OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
 import { PresenceService } from '../services/presence.service';
-import { TaskService } from 'src/task/task.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
@@ -45,7 +43,7 @@ export class BoardGateway implements OnGatewayDisconnect {
 
       client.data.userId = payload.sub;
       client.data.email = payload.email;
-    } catch (err) {
+    } catch {
       client.disconnect();
     }
   }
