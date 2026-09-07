@@ -1,22 +1,28 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { CreateColumnDto } from './dto/create-column.dto';
 import { ReorderColumnDto } from './dto/reorder-column.dto';
 
 @Injectable()
 export class ColumnService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
+  ) {}
 
   async create(boardId: string, dto: CreateColumnDto) {
     const count = await this.prisma.column.count({ where: { boardId } });
-    return this.prisma.column.create({
+    const created = await this.prisma.column.create({
       data: { name: dto.name, order: count, boardId },
     });
+    await this.redisService.del(`board:${boardId}`);
+    return created;
   }
 
   async reorder(boardId: string, dto: ReorderColumnDto) {
     // Cập nhật order hàng loạt trong 1 transaction — đảm bảo không bị lệch nếu có lỗi giữa chừng
-    return this.prisma.$transaction(
+    const result = await this.prisma.$transaction(
       dto.columns.map((col) =>
         this.prisma.column.update({
           where: { id: col.id },
@@ -24,11 +30,15 @@ export class ColumnService {
         }),
       ),
     );
+    await this.redisService.del(`board:${boardId}`);
+    return result;
   }
 
   async remove(id: string) {
     const column = await this.prisma.column.findUnique({ where: { id } });
     if (!column) throw new NotFoundException('Column không tồn tại');
-    return this.prisma.column.delete({ where: { id } }); // cascade tự xóa task con
+    const deleted = await this.prisma.column.delete({ where: { id } }); // cascade tự xóa task con
+    await this.redisService.del(`board:${column.boardId}`);
+    return deleted;
   }
 }

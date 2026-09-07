@@ -107,22 +107,32 @@ Tài liệu này là báo cáo kỹ thuật chuyên sâu đối chiếu **trực
 ## 2. Chiến Lược Lưu Bộ Nhớ Đệm (Caching Strategy)
 
 ### 2.1. Caching Tầng Ứng Dụng (Application Cache)
-- **Trạng thái**: **Chưa áp dụng**
-- **Đánh giá & Bằng chứng**:
-  - Container `redis:7-alpine` có mặt trong [docker-compose.yml:22-35](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/docker-compose.yml#L22-L35).
-  - Tuy nhiên, trong [package.json](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/package.json) hoàn toàn **không cài đặt** các package như `ioredis`, `redis`, `@nestjs/cache-manager`, hay `cache-manager`.
-  - Toàn bộ các service nghiệp vụ (`BoardService`, `TaskService`, `ColumnService`, `AuthService`) đều truy vấn trực tiếp vào PostgreSQL qua Prisma mà không có tầng kiểm tra cache.
-  - *Lưu ý*: Lớp `PresenceService` ([src/realtime/services/presence.service.ts:10-30](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/realtime/services/presence.service.ts#L10-L30)) có dùng biến in-memory `private rooms = new Map<string, Map<string, OnlineMember>>()`. Đây là **quản lý trạng thái phiên trực tuyến tạm thời (Session/Presence State)** của WebSocket, không phải là Cache dữ liệu của Database.
+- **Trạng thái**: **Đang áp dụng (Redis In-Memory Cache)**
+- **Bằng chứng trong mã nguồn**:
+  - Container `redis:7-alpine` trong [docker-compose.yml:22-35](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/docker-compose.yml#L22-L35).
+  - Thư viện `ioredis` được cài đặt và quản lý tập trung thông qua `RedisModule` toàn cục ([src/redis/redis.module.ts](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/redis/redis.module.ts)) và [src/redis/redis.service.ts](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/redis/redis.service.ts).
+  - Thiết kế có cơ chế **Graceful Degradation / Cache Bypass**: Nếu Redis gặp sự cố hoặc gián đoạn mạng, `RedisService` tự động bắt lỗi và trả về `null` để server fallback trực tiếp sang PostgreSQL, không làm gián đoạn request của người dùng.
 
 ---
 
-### 2.2. Caching Patterns (Cache-Aside, Write-Through, Write-Back, Read-Through)
-- **Trạng thái**: **Chưa áp dụng**
+### 2.2. Caching Patterns (Cache-Aside Pattern)
+- **Trạng thái**: **Đang áp dụng cho dữ liệu Bảng Kanban (`GET /boards/:id`)**
+- **Bằng chứng & Luồng xử lý trong mã nguồn**:
+  1. **Đọc dữ liệu (Cache-Aside Read)**:
+     - Tại [src/board/board.service.ts:46-77](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/board/board.service.ts#L46-L77), hàm `findOne()` kiểm tra cache Redis theo khóa `board:${id}`:
+       - *Cache HIT*: Lấy trực tiếp dữ liệu từ Redis RAM, kiểm tra quyền xem của user và trả về phản hồi trong ~1–2ms.
+       - *Cache MISS*: Truy vấn đầy đủ Board kèm Columns và Tasks từ PostgreSQL qua Prisma, kiểm tra quyền và lưu kết quả vào Redis với TTL 10 phút (`set(cacheKey, board, 600)`).
+  2. **Vô hiệu hóa bộ nhớ đệm (Cache Invalidation)**:
+     - Khi Board thay đổi (cập nhật thông tin, xóa board, thành viên mới gia nhập): [src/board/board.service.ts](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/board/board.service.ts) gọi `this.redisService.del("board:" + id)`.
+     - Khi Column thay đổi (tạo cột, sắp xếp lại thứ tự `reorder`, xóa cột): [src/collumn/column.service.ts](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/collumn/column.service.ts) gọi `this.redisService.del("board:" + boardId)`.
+     - Khi Task thay đổi (tạo task, sửa task, chuyển cột `move`, xóa task): [src/task/task.service.ts](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/task/task.service.ts) gọi `this.redisService.del("board:" + column.boardId)`.
 
 ---
 
-### 2.3. Chính Sách Thu Hồi Bộ Nhớ Đệm (Eviction Policies: TTL, LRU, LFU)
-- **Trạng thái**: **Chưa áp dụng**
+### 2.3. Chính Sách Thu Hồi Bộ Nhớ Đệm (Eviction Policies: TTL)
+- **Trạng thái**: **Đang áp dụng (Time-To-Live - TTL)**
+- **Bằng chứng trong mã nguồn**:
+  - Dữ liệu Board được gán TTL mặc định 600 giây (10 phút) thông qua lệnh `SET ... EX 600` tại [src/redis/redis.service.ts](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/redis/redis.service.ts) và [src/board/board.service.ts:75](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/board/board.service.ts#L75). Dữ liệu tự động được giải phóng khỏi RAM khi hết hạn.
 
 ---
 
@@ -161,31 +171,19 @@ Tài liệu này là báo cáo kỹ thuật chuyên sâu đối chiếu **trực
 ---
 
 ### 3.2. Mô Hình Xuất Bản / Đăng Ký (Pub/Sub Pattern)
-- **Trạng thái**: **Đang áp dụng trong phạm vi cục bộ (In-Process WebSocket Rooms)**
+- **Trạng thái**: **Đang áp dụng (Redis Pub/Sub Adapter cho WebSocket)**
 - **Bằng chứng trong mã nguồn**:
-  - File: [src/realtime/gateways/board.gateway.ts](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/realtime/gateways/board.gateway.ts)
-  - Lớp: `BoardGateway`
-  - Đăng ký kênh (Subscribe to Topic):
-    ```typescript
-    // Dòng 59: Client tham gia phòng theo boardId
-    client.join(data.boardId);
-    ```
-  - Hủy đăng ký kênh (Unsubscribe):
-    ```typescript
-    // Dòng 77: Client rời khỏi phòng
-    client.leave(data.boardId);
-    ```
-  - Xuất bản dữ liệu tới kênh (Publish to Topic):
-    ```typescript
-    // Dòng 69, 84, 155: Gửi thông báo cập nhật presence cho toàn bộ subscriber trong room
-    this.server.to(data.boardId).emit('presence:update', online);
-
-    // Dòng 94: Gửi vị trí con trỏ tới mọi subscriber trừ người gửi
-    client.to(data.boardId).emit('cursor:update', { userId: client.data.userId, x: data.x, y: data.y });
-    ```
-- **Hạn chế về tính phân tán**:
-  - Chỉ hoạt động trên một Node.js process đơn lẻ.
-  - Khi scale ngang (Horizontal Scaling) thành nhiều container qua Kubernetes hoặc Docker Swarm, các client ở khác container sẽ không nhìn thấy nhau do **chưa tích hợp Redis Pub/Sub Adapter** (`@socket.io/redis-adapter`).
+  1. **Tích hợp Redis Adapter cho Socket.IO**:
+     - File: [src/realtime/adapters/redis-io.adapter.ts](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/realtime/adapters/redis-io.adapter.ts)
+     - Khởi tạo hai kết nối Redis (`pubClient` và `subClient` qua `ioredis`) và gán adapter bằng `createAdapter(pubClient, subClient)` từ thư viện `@socket.io/redis-adapter`.
+     - Được đăng ký toàn cục tại [src/main.ts](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/main.ts) thông qua `app.useWebSocketAdapter(redisIoAdapter)`.
+     - Thiết kế **Graceful Fallback**: Nếu Redis offline hoặc gặp lỗi kết nối, adapter tự động chuyển về in-memory adapter mặc định của Socket.IO, tránh làm sập ứng dụng.
+  2. **Đồng bộ sự kiện và Phòng (Rooms) phân tán**:
+     - File: [src/realtime/gateways/board.gateway.ts](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/src/realtime/gateways/board.gateway.ts)
+     - Quản lý kênh/phòng qua `client.join(data.boardId)` và `client.leave(data.boardId)`.
+     - Khi một container phát sự kiện (`this.server.to(boardId).emit(...)` hoặc `client.to(boardId).emit(...)`), Redis Pub/Sub sẽ tự động broadcast sự kiện đó tới tất cả các instance/pod khác trong cụm để gửi tiếp tới client đích.
+- **Khả năng mở rộng (Scalability)**:
+  - Cho phép hệ thống scale ngang (Horizontal Scaling) thành nhiều container (Cluster / Kubernetes Pods) đằng sau Load Balancer mà không làm đứt gãy kết nối hoặc thất lạc sự kiện thời gian thực giữa các người dùng ở khác container.
 
 ---
 

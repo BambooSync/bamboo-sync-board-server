@@ -9,12 +9,14 @@ import { BoardModule } from './board/board.module';
 import { ColumnModule } from './collumn/column.module';
 import { TaskModule } from './task/task.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     EventEmitterModule.forRoot(),
     PrismaModule,
+    RedisModule,
     AuthModule,
     BoardModule,
     ColumnModule,
