@@ -15,12 +15,17 @@ graph TB
         MobileClient["Mobile App (Client)"]
     end
 
-    subgraph EntryPoint["API & Network Layer"]
-        HttpEntry["HTTP REST API (:3000)"]
-        WsEntry["WebSocket Gateway (:3000)"]
+    subgraph ReverseProxy["Edge & Reverse Proxy Layer"]
+        NginxProxy["Nginx 1.25 Reverse Proxy (:80 / :443)"]
+    end
+
+    subgraph EntryPoint["NestJS Network Layer"]
+        HttpEntry["HTTP REST API (Internal :3000)"]
+        WsEntry["WebSocket Gateway (Internal :3000)"]
     end
 
     subgraph Security["Security & Middleware Layer"]
+        ThrottlerGuard["RedisThrottlerGuard (Rate Limiting)"]
         JwtGuard["JwtAuthGuard (Passport JWT)"]
         WsAuth["WS Handshake Auth (JWT Verify)"]
         ValidationPipe["Class Validator & Transformer"]
@@ -34,20 +39,23 @@ graph TB
         TaskMod["TaskModule (Tasks & Move)"]
         RealtimeMod["RealtimeModule (Presence & Events)"]
         PrismaMod["PrismaModule (Database Access)"]
+        RedisMod["RedisModule (ioredis & Cache-Aside)"]
     end
 
     subgraph StateAndStorage["Data & State Layer"]
         InMemoryState["Presence State (In-Memory Map)"]
         Postgres[("PostgreSQL 16 Database")]
-        RedisContainer["Redis 7 (Docker Compose - Dự phòng)"]
+        RedisContainer[("Redis 7 (Cache, Pub/Sub & Throttler)")]
     end
 
-    WebClient -->|HTTP REST| HttpEntry
-    MobileClient -->|HTTP REST| HttpEntry
-    WebClient -->|WebSocket WSS| WsEntry
-    MobileClient -->|WebSocket WSS| WsEntry
+    WebClient -->|HTTP / WebSocket| NginxProxy
+    MobileClient -->|HTTP / WebSocket| NginxProxy
 
-    HttpEntry --> ValidationPipe --> JwtGuard
+    NginxProxy -->|HTTP proxy_pass| HttpEntry
+    NginxProxy -->|WebSocket Upgrade proxy_pass| WsEntry
+
+    HttpEntry --> ValidationPipe --> ThrottlerGuard --> JwtGuard
+    ThrottlerGuard -->|Counter & Limit| RedisContainer
     WsEntry --> WsAuth
 
     JwtGuard --> AuthMod
@@ -57,6 +65,7 @@ graph TB
 
     WsAuth --> RealtimeMod
     RealtimeMod --> InMemoryState
+    RealtimeMod -->|Redis Pub/Sub Adapter| RedisContainer
     RealtimeMod -.->|Dự kiến liên kết| TaskMod
 
     BoardMod --> PrismaMod
@@ -64,6 +73,11 @@ graph TB
     TaskMod --> PrismaMod
     AuthMod --> PrismaMod
 
+    BoardMod --> RedisMod
+    ColMod --> RedisMod
+    TaskMod --> RedisMod
+
+    RedisMod -->|TCP :6379| RedisContainer
     PrismaMod -->|Prisma ORM Client| Postgres
 ```
 
@@ -119,8 +133,19 @@ graph LR
    - Tự động tính toán thứ tự (`order`) dựa trên tổng số task hiện có trong cột.
 
 7. **`RealtimeModule` (`src/realtime/`)**:
-   - `BoardGateway` (`src/realtime/gateways/board.gateway.ts`): Quản lý kết nối Socket.IO, phòng làm việc (Rooms), bắt sự kiện di chuyển con trỏ chuột (`cursor:move`), trạng thái soạn thảo (`typing:start`, `typing:stop`).
+   - `BoardGateway` (`src/realtime/gateways/board.gateway.ts`): Quản lý kết nối Socket.IO, phòng làm việc (Rooms), bắt sự kiện di chuyển con trỏ chuột (`cursor:move`), trạng thái soạn thảo (`typing:start`, `typing:stop`), phát sóng đột biến task (`task.created`, `task.moved`, v.v.).
+   - `RedisIoAdapter` (`src/realtime/adapters/redis-io.adapter.ts`): Cung cấp adapter Socket.IO trên nền Redis Pub/Sub (`@socket.io/redis-adapter`) hỗ trợ scale ngang đa container đằng sau Load Balancer.
    - `PresenceService` (`src/realtime/services/presence.service.ts`): Lưu trữ trạng thái danh sách thành viên đang trực tuyến (online) trên từng Board.
+
+8. **`RedisModule` & `RedisService` (`src/redis/`)**:
+   - Module toàn cục (`@Global()`) đóng gói client `ioredis`, kết nối tới Redis 7 tại port 6379.
+   - Cung cấp cơ chế Cache-Aside (Lazy Loading) kèm TTL cho các truy vấn xem chi tiết bảng (`GET /boards/:id`) và cơ chế Invalidation khi có đột biến dữ liệu.
+   - Tích hợp tính năng Graceful Degradation (tự động bypass sang PostgreSQL nếu Redis gặp sự cố, không để crash ứng dụng).
+
+9. **`Nginx Reverse Proxy` (`nginx/nginx.conf`)**:
+   - Đóng vai trò cổng vào duy nhất (Edge Gateway) mở cổng 80/443 ra ngoài Internet.
+   - Giấu kín các cổng nội bộ của NestJS (`:3000`), Postgres (`:5432`), và Redis (`:6379`) trong mạng riêng Docker.
+   - Chuyên trách nâng cấp kết nối WebSocket (`Upgrade`, `Connection`), cân bằng tải upstream (`ip_hash`), nén Gzip và tăng cường bảo mật HTTP headers.
 
 ---
 
@@ -196,11 +221,12 @@ Kiến trúc hiện tại phân định rõ:
 - **Quyết định**: Không thực hiện các hành động tạo/sửa/xóa task qua socket events một cách thuần túy, mà chuyển hoàn toàn sang REST API (`POST`, `PATCH`, `DELETE`).
 - **Lý do**: Đảm bảo tuân thủ chuẩn RESTful, dễ dàng áp dụng NestJS Guards (`JwtAuthGuard`), Pipes (`ValidationPipe`), phân trang và bắt lỗi HTTP chuẩn xác hơn so với WebSocket acknowledgement.
 
-### 4.2. Quản lý Trạng thái Trực tuyến trong Bộ nhớ (In-Memory Presence)
-- **Quyết định**: `PresenceService` sử dụng cấu trúc dữ liệu `Map<string, Map<string, OnlineMember>>` trực tiếp trong RAM của Node.js process.
+### 4.2. Quản lý Trạng thái Trực tuyến & Đồng bộ Realtime Đa Tiến Trình (Multi-Instance Socket.IO)
+- **Quyết định**: 
+  - Tích hợp `RedisIoAdapter` (`@socket.io/redis-adapter`) để làm cầu nối broadcast toàn bộ sự kiện bảng Kanban và quản lý Socket.IO Rooms giữa các server instance qua Redis Pub/Sub.
+  - `PresenceService` lưu trữ danh sách thành viên trực tuyến cục bộ trên RAM Node.js và đồng bộ danh sách qua event `presence:update` broadcast xuyên suốt cụm server.
 - **Đánh giá**:
-  - *Ưu điểm*: Cực nhanh (zero network latency), không phát sinh chi phí hạ tầng hay phụ thuộc bên thứ 3.
-  - *Hạn chế*: Không hỗ trợ scale đa tiến trình (multi-instance) hoặc cluster trừ khi tích hợp Redis Pub/Sub hoặc Redis Adapter cho Socket.IO.
+  - *Ưu điểm*: Cực nhanh, hỗ trợ scale ngang đa container đằng sau Load Balancer mà không bị mất kết nối hay sót sự kiện giữa các client ở các pod khác nhau. Hỗ trợ graceful fallback sang in-memory nếu Redis offline.
 
 ### 4.3. Ràng buộc Toàn vẹn Dữ liệu ở Tầng Cơ sở Dữ liệu (Database-level Cascades)
 - **Quyết định**: Toàn bộ quan hệ cha-con quan trọng (`Board -> Column`, `Column -> Task`, `Board -> ActivityLog`) đều được khai báo `onDelete: Cascade` ở mức Foreign Key trong PostgreSQL (`prisma/schema.prisma`).

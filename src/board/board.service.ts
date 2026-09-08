@@ -4,12 +4,16 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { CreateBoardDto } from './dto/create-board.dto';
 import { UpdateBoardDto } from './dto/update-board.dto';
 
 @Injectable()
 export class BoardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
+  ) {}
 
   async create(dto: CreateBoardDto, ownerId: string) {
     // Create a new board with default columns and add the owner as a member
@@ -45,6 +49,25 @@ export class BoardService {
   }
 
   async findOne(id: string, userId: string) {
+    const cacheKey = `board:${id}`;
+    const cachedBoard = await this.redisService.get<{
+      id: string;
+      ownerId: string;
+      members: Array<{ userId: string | null }>;
+    }>(cacheKey);
+
+    if (cachedBoard) {
+      const isMember =
+        cachedBoard.ownerId === userId ||
+        cachedBoard.members.some((m) => m.userId === userId);
+      if (!isMember) {
+        throw new ForbiddenException(
+          'You do not have permission to view this board',
+        );
+      }
+      return cachedBoard;
+    }
+
     // Check if the user is a member or owner of the board
     const board = await this.prisma.board.findUnique({
       where: { id },
@@ -65,24 +88,32 @@ export class BoardService {
         'You do not have permission to view this board',
       );
 
+    await this.redisService.set(cacheKey, board, 600);
+
     return board;
   }
 
   async update(id: string, dto: UpdateBoardDto, userId: string) {
     // Check if the user is the owner or an editor of the board
     await this.checkOwnerOrEditor(id, userId);
-    return this.prisma.board.update({ where: { id }, data: dto });
+    const updated = await this.prisma.board.update({
+      where: { id },
+      data: dto,
+    });
+    await this.redisService.del(`board:${id}`);
+    return updated;
   }
 
   async remove(id: string, userId: string) {
     // Check if the user is the owner of the board
-
     const board = await this.prisma.board.findUnique({ where: { id } });
     if (!board) throw new NotFoundException('Board not exist');
     if (board.ownerId !== userId)
       throw new ForbiddenException('Only the owner can delete the board');
 
-    return this.prisma.board.delete({ where: { id } });
+    const deleted = await this.prisma.board.delete({ where: { id } });
+    await this.redisService.del(`board:${id}`);
+    return deleted;
   }
 
   async joinByInviteCode(inviteCode: string, userId: string) {
@@ -101,6 +132,8 @@ export class BoardService {
     await this.prisma.boardMember.create({
       data: { boardId: board.id, userId, memberRole: 'EDITOR' },
     });
+
+    await this.redisService.del(`board:${board.id}`);
 
     return board;
   }

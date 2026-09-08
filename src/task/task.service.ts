@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { MoveTaskDto } from './dto/move-task.dto';
@@ -10,6 +11,7 @@ export class TaskService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly redisService: RedisService,
   ) {}
 
   async create(columnId: string, dto: CreateTaskDto, userId: string) {
@@ -34,6 +36,8 @@ export class TaskService {
       boardId: column.boardId,
       task,
     });
+
+    await this.redisService.del(`board:${column.boardId}`);
 
     return task;
   }
@@ -67,6 +71,8 @@ export class TaskService {
       task,
     });
 
+    await this.redisService.del(`board:${column.boardId}`);
+
     return task;
   }
 
@@ -93,6 +99,8 @@ export class TaskService {
       task,
     });
 
+    await this.redisService.del(`board:${column.boardId}`);
+
     return task;
   }
 
@@ -113,6 +121,8 @@ export class TaskService {
       boardId: existing.column.boardId,
       taskId: id,
     });
+
+    await this.redisService.del(`board:${existing.column.boardId}`);
 
     return deleted;
   }
