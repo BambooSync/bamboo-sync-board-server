@@ -244,7 +244,7 @@ Tài liệu này là báo cáo kỹ thuật chuyên sâu đối chiếu **trực
 | **Circuit Breaker** | **Chưa áp dụng** | Không có cơ chế ngắt mạch tự động khi database hoặc dịch vụ ngoài gặp sự cố. |
 | **Retry / Backoff** | **Chưa áp dụng** | Chưa cấu hình retry chính sách với hàm bọc hoặc interceptor. |
 | **Idempotency Key** | **Chưa áp dụng** | Các thao tác tạo mới (`POST /boards`, `POST /tasks`) chưa hỗ trợ Header khóa chống tạo trùng lặp. |
-| **Load Balancing** | **Chưa áp dụng** | Chưa có cấu hình reverse proxy Nginx hoặc load balancer trong repo. |
+| **Load Balancing** | **Đang áp dụng (Nginx Reverse Proxy & Load Balancer)** | Cấu hình Nginx reverse proxy tại [nginx/nginx.conf](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/nginx/nginx.conf) và [docker-compose.yml](file:///c:/Users/MY%20MSI/Desktop/Project/Software/BambooSync/server/docker-compose.yml). Mở cổng 80, giấu kín cổng nội bộ của backend/db/cache, hỗ trợ WebSocket proxying (`Upgrade`, `Connection`), bảo mật headers, nén Gzip và upstream load balancing (`ip_hash`). |
 | **Service Discovery** | **Chưa áp dụng** | Không cần thiết vì hệ thống là Monolith đơn lẻ. |
 | **API Gateway** | **Chưa áp dụng** | Routing và xử lý logic tập trung trực tiếp trong NestJS application. |
 | **CQRS (Command Query Responsibility Segregation)** | **Chưa áp dụng** | Các service dùng chung một Prisma Client model cho cả tác vụ đọc và ghi. |

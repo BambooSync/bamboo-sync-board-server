@@ -31,7 +31,10 @@ describe('AppController (e2e)', () => {
     for (let i = 0; i < 5; i++) {
       await request(server)
         .post('/auth/login')
-        .send({ email: 'ratelimit_test@example.com', password: 'wrongpassword' })
+        .send({
+          email: 'ratelimit_test@example.com',
+          password: 'wrongpassword',
+        })
         .expect((res) => {
           expect(res.status).not.toBe(429);
         });
@@ -48,4 +51,3 @@ describe('AppController (e2e)', () => {
     await app.close();
   });
 });
-

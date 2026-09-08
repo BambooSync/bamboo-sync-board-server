@@ -15,9 +15,13 @@ graph TB
         MobileClient["Mobile App (Client)"]
     end
 
-    subgraph EntryPoint["API & Network Layer"]
-        HttpEntry["HTTP REST API (:3000)"]
-        WsEntry["WebSocket Gateway (:3000)"]
+    subgraph ReverseProxy["Edge & Reverse Proxy Layer"]
+        NginxProxy["Nginx 1.25 Reverse Proxy (:80 / :443)"]
+    end
+
+    subgraph EntryPoint["NestJS Network Layer"]
+        HttpEntry["HTTP REST API (Internal :3000)"]
+        WsEntry["WebSocket Gateway (Internal :3000)"]
     end
 
     subgraph Security["Security & Middleware Layer"]
@@ -44,10 +48,11 @@ graph TB
         RedisContainer[("Redis 7 (Cache, Pub/Sub & Throttler)")]
     end
 
-    WebClient -->|HTTP REST| HttpEntry
-    MobileClient -->|HTTP REST| HttpEntry
-    WebClient -->|WebSocket WSS| WsEntry
-    MobileClient -->|WebSocket WSS| WsEntry
+    WebClient -->|HTTP / WebSocket| NginxProxy
+    MobileClient -->|HTTP / WebSocket| NginxProxy
+
+    NginxProxy -->|HTTP proxy_pass| HttpEntry
+    NginxProxy -->|WebSocket Upgrade proxy_pass| WsEntry
 
     HttpEntry --> ValidationPipe --> ThrottlerGuard --> JwtGuard
     ThrottlerGuard -->|Counter & Limit| RedisContainer
@@ -136,6 +141,11 @@ graph LR
    - Module toàn cục (`@Global()`) đóng gói client `ioredis`, kết nối tới Redis 7 tại port 6379.
    - Cung cấp cơ chế Cache-Aside (Lazy Loading) kèm TTL cho các truy vấn xem chi tiết bảng (`GET /boards/:id`) và cơ chế Invalidation khi có đột biến dữ liệu.
    - Tích hợp tính năng Graceful Degradation (tự động bypass sang PostgreSQL nếu Redis gặp sự cố, không để crash ứng dụng).
+
+9. **`Nginx Reverse Proxy` (`nginx/nginx.conf`)**:
+   - Đóng vai trò cổng vào duy nhất (Edge Gateway) mở cổng 80/443 ra ngoài Internet.
+   - Giấu kín các cổng nội bộ của NestJS (`:3000`), Postgres (`:5432`), và Redis (`:6379`) trong mạng riêng Docker.
+   - Chuyên trách nâng cấp kết nối WebSocket (`Upgrade`, `Connection`), cân bằng tải upstream (`ip_hash`), nén Gzip và tăng cường bảo mật HTTP headers.
 
 ---
 
