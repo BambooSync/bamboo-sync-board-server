@@ -10,6 +10,8 @@ jobs:
   lint-and-test:
     name: Lint, Build & Test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
 
     services:
       postgres:
@@ -90,6 +92,8 @@ jobs:
     name: Docker Image Build Test
     needs: lint-and-test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
 
     steps:
       - name: Checkout repository
