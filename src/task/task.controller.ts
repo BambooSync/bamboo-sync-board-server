@@ -8,6 +8,7 @@ import {
   Body,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { TaskService } from './task.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -15,6 +16,8 @@ import { MoveTaskDto } from './dto/move-task.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
+@ApiTags('Tasks')
+@ApiBearerAuth('JWT-auth')
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class TaskController {

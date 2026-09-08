@@ -9,12 +9,15 @@ import {
   UseGuards,
   Req,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { BoardService } from './board.service';
 import { CreateBoardDto } from './dto/create-board.dto';
 import { UpdateBoardDto } from './dto/update-board.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import type { Request } from 'express';
 
+@ApiTags('Boards')
+@ApiBearerAuth('JWT-auth')
 @Controller('boards')
 @UseGuards(JwtAuthGuard) // gắn Guard cho TOÀN BỘ Controller, không cần lặp lại từng route
 export class BoardController {

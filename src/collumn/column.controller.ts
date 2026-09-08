@@ -7,11 +7,14 @@ import {
   Body,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ColumnService } from './column.service';
 import { CreateColumnDto } from './dto/create-column.dto';
 import { ReorderColumnDto } from './dto/reorder-column.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 
+@ApiTags('Columns')
+@ApiBearerAuth('JWT-auth')
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class ColumnController {

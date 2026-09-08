@@ -2,8 +2,9 @@
 
 Tài liệu này tổng hợp toàn bộ các **HTTP REST Endpoints** và **WebSocket Events** thực tế được định nghĩa trong codebase của **BambooSync Server**.
 
-> [!NOTE]
-> Dự án hiện tại **chưa tích hợp Swagger/OpenAPI** (`@nestjs/swagger`). Tài liệu dưới đây phản ánh 100% các controller, router decorator, DTO và logic thực tế trong mã nguồn.
+> [!TIP]
+> Hệ thống **đã tích hợp Swagger/OpenAPI UI** (`@nestjs/swagger`) tại đường dẫn **`/api/docs`** (truy cập qua `http://localhost:3000/api/docs` hoặc qua Nginx tại `http://localhost:8080/api/docs`). Bạn có thể xem schema trực quan và sử dụng tính năng "Try it out" để test API trực tiếp trên trình duyệt.
+
 
 ---
 
