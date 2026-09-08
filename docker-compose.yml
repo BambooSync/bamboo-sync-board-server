@@ -19,16 +19,19 @@ services:
     restart: unless-stopped
     expose:
       - "3000"
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
-      PORT: 3000
-      DATABASE_URL: postgresql://bamboo:bamboo123@postgres:5432/bamboosyncboard?schema=public
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      JWT_ACCESS_SECRET: dev_access_secret_key_123456789
-      JWT_REFRESH_SECRET: dev_refresh_secret_key_123456789
-      JWT_ACCESS_EXPIRES_IN: 15m
-      JWT_REFRESH_EXPIRES_IN: 7d
+      PORT: ${PORT:-3000}
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://bamboo:bamboo123@postgres:5432/bamboosyncboard?schema=public}
+      REDIS_HOST: ${DOCKER_REDIS_HOST:-redis}
+      REDIS_PORT: ${DOCKER_REDIS_PORT:-6379}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+
     depends_on:
       postgres:
         condition: service_healthy
